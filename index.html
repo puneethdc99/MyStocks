@@ -286,6 +286,12 @@
           <span id="market-status-text" class="text-xs text-text-muted">Market Closed</span>
           <span id="market-time" class="text-xs text-text-muted ml-auto"></span>
         </div>
+        <!-- Theme Toggle -->
+        <button id="theme-toggle-btn" onclick="UI.toggleTheme()" class="nav-link w-full group">
+          <i id="theme-icon" data-lucide="sun" class="w-5 h-5"></i>
+          <span id="theme-label">Light Mode</span>
+          <span class="ml-auto text-xs text-text-muted opacity-60 group-hover:opacity-100">Toggle</span>
+        </button>
         <button onclick="Auth.logout()" class="nav-link w-full text-loss hover:bg-loss/10 hover:text-loss group">
           <i data-lucide="log-out" class="w-5 h-5"></i>
           <span>Logout</span>

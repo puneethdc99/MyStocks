@@ -74,12 +74,14 @@ const Settings = (() => {
 const App = (() => {
     let _prevSection = 'dashboard';
 
-    /* ── Boot ── */
     async function boot() {
         // Init Lucide icons
         if (window.lucide) lucide.createIcons();
 
-        // Seed demo account
+        // Apply saved theme + sync toggle button
+        UI.initTheme();
+
+        // Restore session if present
         const session = Auth.init();
 
         if (session) {

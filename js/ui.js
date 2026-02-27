@@ -225,11 +225,44 @@ const UI = (() => {
     time.textContent = `${hh}:${mm} IST`;
   }
 
+  /* ── Theme Toggle ── */
+  const THEME_KEY = 'nse_theme';
+
+  function applyTheme(theme) {
+    const isDark = (theme !== 'light');
+    document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+    localStorage.setItem(THEME_KEY, isDark ? 'dark' : 'light');
+
+    const iconEl = document.getElementById('theme-icon');
+    const labelEl = document.getElementById('theme-label');
+    if (iconEl) {
+      iconEl.setAttribute('data-lucide', isDark ? 'sun' : 'moon');
+      if (labelEl) labelEl.textContent = isDark ? 'Light Mode' : 'Dark Mode';
+      if (window.lucide) lucide.createIcons({ nodes: [iconEl] });
+    }
+  }
+
+  function toggleTheme() {
+    const current = document.documentElement.getAttribute('data-theme') || 'dark';
+    applyTheme(current === 'dark' ? 'light' : 'dark');
+  }
+
+  function initTheme() {
+    applyTheme(localStorage.getItem(THEME_KEY) || 'dark');
+  }
+
   /* ── Public API ── */
   return {
     openSidebar, closeSidebar, showSection, showToast,
     showSkeleton, hideSkeleton, handleSearch,
     openAddStock, closeAddStock, updateMarketStatus,
+    toggleTheme, applyTheme, initTheme,
     POPULAR
   };
+})();
+
+// Apply saved theme immediately (prevents flash-of-dark on light mode)
+(function () {
+  const t = localStorage.getItem('nse_theme') || 'dark';
+  document.documentElement.setAttribute('data-theme', t);
 })();
