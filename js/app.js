@@ -32,9 +32,9 @@ const Settings = (() => {
 
     function clearWatchlist() {
         if (!confirm('Clear all watchlist stocks?')) return;
-        localStorage.removeItem('nse_watchlist');
-        Watchlist.init();
-        Watchlist.renderWatchlist();
+        // Remove each stock from the current user's list (Watchlist handles the per-user key)
+        const list = [...Watchlist.getList()];
+        list.forEach(s => Watchlist.remove(s));
         update();
         UI.showToast('Watchlist cleared', 'info');
     }
@@ -107,7 +107,7 @@ const App = (() => {
         document.getElementById('page-auth').classList.add('hidden');
         document.getElementById('page-app').classList.remove('hidden');
 
-        // Populate sidebar user info
+        // ── Sidebar user info ──
         const dn = document.getElementById('user-name-display');
         const de = document.getElementById('user-email-display');
         const av = document.getElementById('user-avatar');
@@ -115,22 +115,39 @@ const App = (() => {
         if (de) de.textContent = session.email;
         if (av) av.textContent = session.name.charAt(0).toUpperCase();
 
-        // Init modules
+        // ── Personalized dashboard greeting ──
+        const greetEl = document.getElementById('dashboard-greeting');
+        const subtitleEl = document.getElementById('dashboard-subtitle');
+        if (greetEl) {
+            const istHour = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })).getHours();
+            const timeOfDay = istHour < 12 ? 'morning' : istHour < 17 ? 'afternoon' : 'evening';
+            const firstName = session.name.split(' ')[0];
+            greetEl.textContent = `Good ${timeOfDay}, ${firstName}!`;
+        }
+        if (subtitleEl) subtitleEl.textContent = 'NSE · BSE — Live data via Yahoo Finance';
+
+        // ── Load this user's watchlist ──
+        Watchlist.setUser(session.email);
         Watchlist.init();
         Settings.update();
 
-        // Re-render icons inside app
+        // Re-render icons inside app shell
         setTimeout(() => lucide.createIcons(), 50);
 
         // Route to hash or default dashboard
         _route(window.location.hash || '#/dashboard');
     }
 
+
     /* ── Login Callback ── */
-    function onLogin(user) {
+    function onLogin(user, isNew = false) {
         const session = Auth.getSession();
         showApp(session);
-        UI.showToast(`Welcome back, ${user.name}! 👋`, 'success');
+        if (isNew) {
+            UI.showToast(`Account created! Welcome, ${user.name} 🎉`, 'success', 4000);
+        } else {
+            UI.showToast(`Welcome back, ${user.name}! 👋`, 'success');
+        }
     }
 
     /* ── Hash Router ── */

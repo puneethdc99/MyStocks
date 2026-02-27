@@ -1,26 +1,34 @@
 /* ═══════════════════════════════════════════
-   watchlist.js — Watchlist Management
-   Persists stock list in localStorage.
+   watchlist.js — Per-User Watchlist
+   Storage key: nse_watchlist_{email}
+   Each user has their own isolated watchlist.
 ═══════════════════════════════════════════ */
 const Watchlist = (() => {
-  const KEY = 'nse_watchlist';
+  const KEY_PREFIX = 'nse_watchlist_';
+  let _userKey = KEY_PREFIX + 'default'; // overridden on login
   let _list = [];
   let _searchTimer = null;
 
-  /* ── Load from localStorage ── */
+  /* ── Set active user (call on every login/session restore) ── */
+  function setUser(email) {
+    _userKey = KEY_PREFIX + (email || 'default').replace(/[^a-z0-9@._]/gi, '_');
+    load();       // load THIS user's watchlist
+    updateBadge();
+  }
+
+  /* ── Load from localStorage (user-scoped) ── */
   function load() {
-    try { _list = JSON.parse(localStorage.getItem(KEY)) || []; }
+    try { _list = JSON.parse(localStorage.getItem(_userKey)) || []; }
     catch { _list = []; }
     return _list;
   }
 
   function save() {
-    localStorage.setItem(KEY, JSON.stringify(_list));
+    localStorage.setItem(_userKey, JSON.stringify(_list));
     updateBadge();
   }
 
   function getList() { return [..._list]; }
-
   function has(symbol) { return _list.includes(symbol); }
 
   function add(symbol) {
@@ -55,7 +63,7 @@ const Watchlist = (() => {
 
   /* ── Render Watchlist Grid ── */
   async function renderWatchlist(forceRefresh = false) {
-    load();
+    load(); // always read freshest from localStorage
     const grid = document.getElementById('watchlist-grid');
     const empty = document.getElementById('watchlist-empty');
     if (!grid) return;
@@ -106,6 +114,7 @@ const Watchlist = (() => {
     const priceStr = API.formatPrice(q.price);
     const chgStr = (isPos ? '+' : '') + q.changePct.toFixed(2) + '%';
     const mockTag = q.isMock ? '<span class="text-xs text-text-muted ml-1">(sample)</span>' : '';
+    const asOf = q.asOf ? `<span class="text-xs text-text-muted">as of ${q.asOf}</span>` : '';
 
     card.innerHTML = `
       <div class="flex items-start justify-between mb-2">
@@ -115,7 +124,7 @@ const Watchlist = (() => {
         </div>
         <div class="flex items-center gap-2 flex-shrink-0 ml-2">
           <span class="${isPos ? 'badge-gain' : 'badge-loss'}">${chgStr}</span>
-          <button onclick="Watchlist.remove('${sym}')" 
+          <button onclick="Watchlist.remove('${sym}')"
                   class="text-text-muted hover:text-loss transition-colors ml-1" title="Remove">
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
           </button>
@@ -123,16 +132,29 @@ const Watchlist = (() => {
       </div>
       <div class="cursor-pointer" onclick="App.openStock('${sym}')">
         <p class="text-xl font-bold ${isPos ? 'text-gain' : 'text-loss'}">${priceStr}${mockTag}</p>
-        <p class="text-xs text-text-muted mt-0.5">
-          H: ${API.formatPrice(q.high)} · L: ${API.formatPrice(q.low)} · Vol: ${API.formatVolume(q.volume)}
-        </p>
+        <div class="flex items-center justify-between mt-0.5">
+          <p class="text-xs text-text-muted">
+            H: ${API.formatPrice(q.high)} · L: ${API.formatPrice(q.low)} · Vol: ${API.formatVolume(q.volume)}
+          </p>
+          ${asOf}
+        </div>
         <div class="sparkline-container wl-sparkline" id="spark-${id}"></div>
       </div>`;
 
-    // Render sparkline
     if (history.length > 1) {
       setTimeout(() => Charts.renderSparkline(`spark-${id}`, history, isPos), 50);
     }
+  }
+
+  /* ── Manual Refresh (clears cache, forces live fetch) ── */
+  async function refresh() {
+    const btn = document.getElementById('watchlist-refresh-btn');
+    if (btn) { btn.disabled = true; btn.querySelector('svg')?.classList.add('animate-spin'); }
+    API.clearCache();
+    UI.showToast('Refreshing watchlist prices…', 'info', 2000);
+    await renderWatchlist(true);
+    UI.showToast('Watchlist updated ✓', 'success', 2500);
+    if (btn) { btn.disabled = false; btn.querySelector('svg')?.classList.remove('animate-spin'); }
   }
 
   /* ── Search input in watchlist add panel ── */
@@ -141,10 +163,7 @@ const Watchlist = (() => {
     const resultsEl = document.getElementById('watchlist-search-results');
     if (!resultsEl) return;
 
-    if (!query || query.trim().length < 1) {
-      resultsEl.innerHTML = '';
-      return;
-    }
+    if (!query || query.trim().length < 1) { resultsEl.innerHTML = ''; return; }
 
     _searchTimer = setTimeout(() => {
       const q = query.toUpperCase().trim();
@@ -178,26 +197,15 @@ const Watchlist = (() => {
     }, 250);
   }
 
-  /* ── Manual Refresh (clears cache, forces live fetch) ── */
-  async function refresh() {
-    const btn = document.getElementById('watchlist-refresh-btn');
-    if (btn) { btn.disabled = true; btn.querySelector('svg')?.classList.add('animate-spin'); }
-    API.clearCache();
-    UI.showToast('Refreshing watchlist prices…', 'info', 2000);
-    await renderWatchlist(true);
-    UI.showToast('Watchlist updated ✓', 'success', 2500);
-    if (btn) { btn.disabled = false; btn.querySelector('svg')?.classList.remove('animate-spin'); }
-  }
-
   /* ── Init ── */
   function init() {
-    load();
+    // setUser() must be called first with the logged-in email
     updateBadge();
   }
 
   return {
-    init, load, save, getList, has,
+    init, setUser, load, save, getList, has,
     add, remove, toggle,
-    renderWatchlist, refresh, handleSearchInput, updateBadge
+    renderWatchlist, refresh, handleSearchInput, updateBadge,
   };
 })();
