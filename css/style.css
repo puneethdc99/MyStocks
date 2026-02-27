@@ -821,3 +821,13 @@ body {
 [data-theme="light"] #sidebar p {
   color: inherit;
 }
+
+/* ── Auth page "MyStocks" logo text ──
+   Dark mode: white→gray gradient (good on dark bg).
+   Light mode: override to dark navy→slate so it's readable. */
+[data-theme="light"] .auth-logo-text {
+  background-image: linear-gradient(to right, #0f172a, #475569) !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  color: transparent !important;
+}
