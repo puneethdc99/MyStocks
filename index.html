@@ -329,10 +329,16 @@
               <h1 class="text-2xl font-bold">My Watchlist</h1>
               <p class="text-text-muted text-sm mt-0.5">Track your favourite NSE stocks</p>
             </div>
-            <button onclick="UI.openAddStock()" class="btn-primary text-sm gap-2">
-              <i data-lucide="plus" class="w-4 h-4"></i>
-              Add Stock
-            </button>
+            <div class="flex items-center gap-2">
+              <button onclick="Watchlist.refresh()" class="btn-secondary text-sm gap-2" id="watchlist-refresh-btn">
+                <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+                Refresh
+              </button>
+              <button onclick="UI.openAddStock()" class="btn-primary text-sm gap-2">
+                <i data-lucide="plus" class="w-4 h-4"></i>
+                Add Stock
+              </button>
+            </div>
           </div>
 
           <!-- Search + Add modal inline -->
