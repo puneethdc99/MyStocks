@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MyStocks — NSE Stock Analysis</title>
+  <meta name="description"
+    content="A serverless NSE stock analysis dashboard with watchlist, charts, and personal notes. No backend required." />
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            'bg-primary': '#080d18',
+            'bg-secondary': '#0d1526',
+            'bg-card': '#111827',
+            'bg-card-hover': '#1a2540',
+            'border-dim': '#1e2d45',
+            'accent': '#3b82f6',
+            'accent-glow': '#2563eb',
+            'gain': '#22c55e',
+            'loss': '#ef4444',
+            'text-muted': '#6b7280',
+            'text-dim': '#9ca3af',
+          },
+          fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] },
+          boxShadow: {
+            'glow-blue': '0 0 24px rgba(59,130,246,0.18)',
+            'glow-green': '0 0 18px rgba(34,197,94,0.2)',
+            'card': '0 4px 24px rgba(0,0,0,0.4)',
+          },
+          animation: {
+            'shimmer': 'shimmer 1.6s infinite linear',
+            'fade-in': 'fadeIn 0.3s ease-out',
+            'slide-up': 'slideUp 0.35s ease-out',
+            'pulse-slow': 'pulse 3s infinite',
+          },
+          keyframes: {
+            shimmer: { '0%': { backgroundPosition: '-400px 0' }, '100%': { backgroundPosition: '400px 0' } },
+            fadeIn: { '0%': { opacity: 0 }, '100%': { opacity: 1 } },
+            slideUp: { '0%': { opacity: 0, transform: 'translateY(16px)' }, '100%': { opacity: 1, transform: 'translateY(0)' } },
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+    rel="stylesheet" />
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+
+  <!-- Lightweight Charts (TradingView) -->
+  <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+
+<body class="bg-bg-primary text-gray-100 font-sans antialiased overflow-x-hidden">
+
+  <!-- ═══════════════════════════════════════════════
+     TOAST CONTAINER
+════════════════════════════════════════════════ -->
+  <div id="toast-container" class="fixed top-5 right-5 z-[9999] flex flex-col gap-2 pointer-events-none"></div>
+
+  <!-- ═══════════════════════════════════════════════
+     PAGE: LANDING / AUTH (#/ or #/login)
+════════════════════════════════════════════════ -->
+  <section id="page-auth" class="hidden min-h-screen flex items-center justify-center relative overflow-hidden">
+    <!-- Animated BG blobs -->
+    <div class="blob blob-1 absolute w-96 h-96 rounded-full bg-blue-600/10 blur-3xl"></div>
+    <div class="blob blob-2 absolute w-80 h-80 rounded-full bg-indigo-600/8 blur-3xl"></div>
+    <div class="blob blob-3 absolute w-64 h-64 rounded-full bg-violet-600/8 blur-3xl"></div>
+
+    <div class="relative z-10 w-full max-w-md px-4">
+      <!-- Logo -->
+      <div class="text-center mb-8">
+        <div class="inline-flex items-center gap-3 mb-3">
+          <div class="w-10 h-10 bg-accent rounded-xl flex items-center justify-center shadow-glow-blue">
+            <i data-lucide="trending-up" class="w-6 h-6 text-white"></i>
+          </div>
+          <span
+            class="text-3xl font-bold tracking-tight bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent">MyStocks</span>
+        </div>
+        <p class="text-text-muted text-sm">NSE Market Intelligence · No Backend</p>
+      </div>
+
+      <!-- Auth Card -->
+      <div class="glass-card rounded-2xl p-8 shadow-card animate-fade-in">
+        <!-- Tabs -->
+        <div class="flex bg-bg-primary rounded-xl p-1 mb-7 gap-1">
+          <button id="tab-login" onclick="Auth.showTab('login')"
+            class="auth-tab flex-1 py-2 rounded-lg text-sm font-medium transition-all active">Login</button>
+          <button id="tab-signup" onclick="Auth.showTab('signup')"
+            class="auth-tab flex-1 py-2 rounded-lg text-sm font-medium transition-all">Sign Up</button>
+        </div>
+
+        <!-- Login Form -->
+        <form id="form-login" onsubmit="Auth.handleLogin(event)" class="space-y-4">
+          <div class="input-group">
+            <label class="input-label">Email</label>
+            <div class="input-wrapper">
+              <i data-lucide="mail" class="input-icon"></i>
+              <input type="email" id="login-email" placeholder="you@example.com" class="input-field" required />
+            </div>
+          </div>
+          <div class="input-group">
+            <label class="input-label">Password</label>
+            <div class="input-wrapper">
+              <i data-lucide="lock" class="input-icon"></i>
+              <input type="password" id="login-password" placeholder="••••••••" class="input-field" required />
+            </div>
+          </div>
+          <div id="login-error" class="hidden text-loss text-xs text-center py-1"></div>
+          <button type="submit" class="btn-primary w-full mt-2">
+            <span>Sign In</span>
+            <i data-lucide="arrow-right" class="w-4 h-4"></i>
+          </button>
+          <p class="text-center text-text-muted text-xs">
+            Demo: use <span class="text-accent font-medium">demo@mystocks.in / demo123</span>
+          </p>
+        </form>
+
+        <!-- Signup Form -->
+        <form id="form-signup" onsubmit="Auth.handleSignup(event)" class="space-y-4 hidden">
+          <div class="input-group">
+            <label class="input-label">Full Name</label>
+            <div class="input-wrapper">
+              <i data-lucide="user" class="input-icon"></i>
+              <input type="text" id="signup-name" placeholder="Rajesh Kumar" class="input-field" required />
+            </div>
+          </div>
+          <div class="input-group">
+            <label class="input-label">Email</label>
+            <div class="input-wrapper">
+              <i data-lucide="mail" class="input-icon"></i>
+              <input type="email" id="signup-email" placeholder="you@example.com" class="input-field" required />
+            </div>
+          </div>
+          <div class="input-group">
+            <label class="input-label">Password</label>
+            <div class="input-wrapper">
+              <i data-lucide="lock" class="input-icon"></i>
+              <input type="password" id="signup-password" placeholder="Min. 6 characters" class="input-field" required
+                minlength="6" />
+            </div>
+          </div>
+          <div id="signup-error" class="hidden text-loss text-xs text-center py-1"></div>
+          <button type="submit" class="btn-primary w-full mt-2">
+            <span>Create Account</span>
+            <i data-lucide="user-plus" class="w-4 h-4"></i>
+          </button>
+        </form>
+      </div>
+
+      <p class="text-center text-text-muted text-xs mt-5">
+        🔒 All data stored locally in your browser. Zero backend.
+      </p>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════
+     PAGE: APP SHELL (Dashboard/Watchlist/Settings)
+════════════════════════════════════════════════ -->
+  <section id="page-app" class="hidden min-h-screen flex">
+
+    <!-- Sidebar Overlay (mobile) -->
+    <div id="sidebar-overlay" class="fixed inset-0 bg-black/60 z-30 hidden backdrop-blur-sm"
+      onclick="UI.closeSidebar()"></div>
+
+    <!-- Sidebar -->
+    <aside id="sidebar"
+      class="sidebar fixed md:static top-0 left-0 h-full w-64 z-40 bg-bg-secondary border-r border-border-dim flex flex-col transition-transform duration-300 -translate-x-full md:translate-x-0">
+      <!-- Logo -->
+      <div class="p-5 border-b border-border-dim flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-8 h-8 bg-accent rounded-lg flex items-center justify-center shadow-glow-blue">
+            <i data-lucide="trending-up" class="w-4 h-4 text-white"></i>
+          </div>
+          <span class="font-bold text-lg tracking-tight">MyStocks</span>
+        </div>
+        <button onclick="UI.closeSidebar()" class="md:hidden text-text-muted hover:text-white transition-colors">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- User Info -->
+      <div id="sidebar-user" class="px-4 py-4 border-b border-border-dim">
+        <div class="flex items-center gap-3">
+          <div
+            class="w-9 h-9 rounded-full bg-gradient-to-br from-accent to-indigo-500 flex items-center justify-center text-sm font-bold"
+            id="user-avatar">U</div>
+          <div>
+            <p class="text-sm font-medium" id="user-name-display">User</p>
+            <p class="text-xs text-text-muted" id="user-email-display">user@example.com</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Nav Links -->
+      <nav class="flex-1 p-3 space-y-1 overflow-y-auto">
+        <p class="text-xs font-semibold text-text-muted uppercase tracking-wider px-3 py-2">Main</p>
+        <a href="#/dashboard" class="nav-link" data-section="dashboard" onclick="UI.closeSidebar()">
+          <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
+          <span>Dashboard</span>
+        </a>
+        <a href="#/watchlist" class="nav-link" data-section="watchlist" onclick="UI.closeSidebar()">
+          <i data-lucide="star" class="w-5 h-5"></i>
+          <span>Watchlist</span>
+          <span id="watchlist-badge"
+            class="ml-auto text-xs bg-accent/20 text-accent px-2 py-0.5 rounded-full hidden">0</span>
+        </a>
+        <a href="#/market" class="nav-link" data-section="market" onclick="UI.closeSidebar()">
+          <i data-lucide="bar-chart-2" class="w-5 h-5"></i>
+          <span>Market</span>
+        </a>
+        <p class="text-xs font-semibold text-text-muted uppercase tracking-wider px-3 py-2 mt-3">Account</p>
+        <a href="#/settings" class="nav-link" data-section="settings" onclick="UI.closeSidebar()">
+          <i data-lucide="settings" class="w-5 h-5"></i>
+          <span>Settings</span>
+        </a>
+      </nav>
+
+      <!-- Market Status & Logout -->
+      <div class="p-3 border-t border-border-dim space-y-2">
+        <div class="flex items-center gap-2 px-3 py-2">
+          <span id="market-status-dot" class="w-2 h-2 rounded-full bg-loss"></span>
+          <span id="market-status-text" class="text-xs text-text-muted">Market Closed</span>
+          <span id="market-time" class="text-xs text-text-muted ml-auto"></span>
+        </div>
+        <button onclick="Auth.logout()" class="nav-link w-full text-loss hover:bg-loss/10 hover:text-loss group">
+          <i data-lucide="log-out" class="w-5 h-5"></i>
+          <span>Logout</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <div class="flex-1 flex flex-col min-w-0 min-h-screen">
+      <!-- Top Bar -->
+      <header
+        class="sticky top-0 z-20 bg-bg-primary/80 backdrop-blur-md border-b border-border-dim px-4 py-3 flex items-center gap-4">
+        <button onclick="UI.openSidebar()" class="md:hidden text-text-muted hover:text-white transition-colors">
+          <i data-lucide="menu" class="w-6 h-6"></i>
+        </button>
+        <div class="flex-1 max-w-md relative">
+          <i data-lucide="search"
+            class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted pointer-events-none"></i>
+          <input type="text" id="global-search" placeholder="Search stocks (e.g. RELIANCE, TCS)..."
+            class="w-full bg-bg-secondary border border-border-dim rounded-xl pl-9 pr-4 py-2 text-sm focus:outline-none focus:border-accent/60 focus:ring-1 focus:ring-accent/30 transition-all placeholder-text-muted"
+            oninput="UI.handleSearch(this.value)" autocomplete="off" />
+          <div id="search-dropdown"
+            class="hidden absolute top-full left-0 right-0 mt-1 bg-bg-card border border-border-dim rounded-xl shadow-card z-50 overflow-hidden max-h-64 overflow-y-auto">
+          </div>
+        </div>
+        <div class="flex items-center gap-2 ml-auto">
+          <div class="index-pill" id="header-nifty">
+            <span class="text-xs text-text-muted">NIFTY</span>
+            <span class="text-sm font-semibold skeleton-text w-16 h-4"></span>
+          </div>
+          <div class="index-pill" id="header-sensex">
+            <span class="text-xs text-text-muted">SENSEX</span>
+            <span class="text-sm font-semibold skeleton-text w-16 h-4"></span>
+          </div>
+        </div>
+      </header>
+
+      <!-- Page Sections -->
+      <main class="flex-1 overflow-y-auto">
+
+        <!-- ── DASHBOARD ── -->
+        <div id="section-dashboard" class="app-section hidden p-4 md:p-6 space-y-6 animate-slide-up">
+          <div class="flex items-center justify-between">
+            <div>
+              <h1 class="text-2xl font-bold">Market Overview</h1>
+              <p class="text-text-muted text-sm mt-0.5">NSE · BSE — Live data via Yahoo Finance</p>
+            </div>
+            <button onclick="Dashboard.refresh(true)" class="btn-secondary text-sm gap-2" id="refresh-btn">
+              <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+              Refresh
+            </button>
+          </div>
+
+          <!-- Index Cards -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" id="index-cards">
+            <!-- populated by dashboard.js -->
+          </div>
+
+          <!-- Divider -->
+          <div class="flex items-center gap-3">
+            <div class="flex-1 h-px bg-border-dim"></div>
+            <span class="text-text-muted text-xs font-medium uppercase tracking-wider">Top Movers</span>
+            <div class="flex-1 h-px bg-border-dim"></div>
+          </div>
+
+          <!-- Gainers / Losers -->
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div class="glass-card rounded-xl p-4">
+              <h3 class="text-sm font-semibold text-gain mb-3 flex items-center gap-2">
+                <i data-lucide="trending-up" class="w-4 h-4"></i> Top Gainers
+              </h3>
+              <div id="top-gainers" class="space-y-2"></div>
+            </div>
+            <div class="glass-card rounded-xl p-4">
+              <h3 class="text-sm font-semibold text-loss mb-3 flex items-center gap-2">
+                <i data-lucide="trending-down" class="w-4 h-4"></i> Top Losers
+              </h3>
+              <div id="top-losers" class="space-y-2"></div>
+            </div>
+          </div>
+
+          <!-- Last Updated -->
+          <p class="text-xs text-text-muted text-right" id="last-updated"></p>
+        </div>
+
+        <!-- ── WATCHLIST ── -->
+        <div id="section-watchlist" class="app-section hidden p-4 md:p-6 space-y-5 animate-slide-up">
+          <div class="flex items-center justify-between flex-wrap gap-3">
+            <div>
+              <h1 class="text-2xl font-bold">My Watchlist</h1>
+              <p class="text-text-muted text-sm mt-0.5">Track your favourite NSE stocks</p>
+            </div>
+            <button onclick="UI.openAddStock()" class="btn-primary text-sm gap-2">
+              <i data-lucide="plus" class="w-4 h-4"></i>
+              Add Stock
+            </button>
+          </div>
+
+          <!-- Search + Add modal inline -->
+          <div id="add-stock-panel" class="hidden glass-card rounded-xl p-4 space-y-3">
+            <h3 class="text-sm font-semibold">Search & Add Stock</h3>
+            <div class="flex gap-2">
+              <div class="relative flex-1">
+                <i data-lucide="search"
+                  class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted pointer-events-none"></i>
+                <input type="text" id="watchlist-search-input" placeholder="Type stock symbol or name..."
+                  class="w-full bg-bg-primary border border-border-dim rounded-xl pl-9 pr-4 py-2.5 text-sm focus:outline-none focus:border-accent/60 transition-all placeholder-text-muted"
+                  oninput="Watchlist.handleSearchInput(this.value)" autocomplete="off" />
+              </div>
+              <button onclick="UI.closeAddStock()" class="btn-secondary text-sm px-3">
+                <i data-lucide="x" class="w-4 h-4"></i>
+              </button>
+            </div>
+            <div id="watchlist-search-results" class="space-y-1 max-h-48 overflow-y-auto"></div>
+          </div>
+
+          <!-- Watchlist Grid -->
+          <div id="watchlist-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <!-- populated by watchlist.js -->
+          </div>
+
+          <!-- Empty State -->
+          <div id="watchlist-empty" class="hidden flex flex-col items-center justify-center py-16 text-center">
+            <div class="w-16 h-16 bg-bg-card rounded-2xl flex items-center justify-center mb-4">
+              <i data-lucide="star" class="w-8 h-8 text-text-muted"></i>
+            </div>
+            <h3 class="text-lg font-semibold mb-2">Your watchlist is empty</h3>
+            <p class="text-text-muted text-sm mb-5">Add stocks to track their performance and save notes.</p>
+            <button onclick="UI.openAddStock()" class="btn-primary text-sm gap-2">
+              <i data-lucide="plus" class="w-4 h-4"></i>
+              Add your first stock
+            </button>
+          </div>
+        </div>
+
+        <!-- ── MARKET ── -->
+        <div id="section-market" class="app-section hidden p-4 md:p-6 space-y-5 animate-slide-up">
+          <div>
+            <h1 class="text-2xl font-bold">Market Heatmap</h1>
+            <p class="text-text-muted text-sm mt-0.5">NSE Large Cap Sector Overview</p>
+          </div>
+          <div id="market-heatmap" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3"></div>
+        </div>
+
+        <!-- ── STOCK DETAIL ── -->
+        <div id="section-stock" class="app-section hidden p-4 md:p-6 space-y-5 animate-slide-up">
+          <div class="flex items-center gap-3">
+            <button onclick="App.goBack()" class="btn-secondary text-sm gap-2 px-3">
+              <i data-lucide="arrow-left" class="w-4 h-4"></i>
+            </button>
+            <div id="stock-header-info">
+              <div class="skeleton-block h-7 w-40 rounded-lg"></div>
+            </div>
+            <div class="ml-auto flex gap-2">
+              <button id="watchlist-toggle-btn" onclick="Stock.toggleWatchlist()" class="btn-secondary text-sm gap-2">
+                <i data-lucide="star" class="w-4 h-4"></i>
+                <span id="watchlist-toggle-text">Add to Watchlist</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Price Row -->
+          <div id="stock-price-row" class="glass-card rounded-xl p-5 flex flex-wrap items-start gap-6">
+            <div>
+              <p class="text-text-muted text-xs mb-1">Current Price</p>
+              <div class="skeleton-block h-10 w-32 rounded-lg" id="sk-price"></div>
+            </div>
+            <div>
+              <p class="text-text-muted text-xs mb-1">Day Change</p>
+              <div class="skeleton-block h-10 w-24 rounded-lg" id="sk-change"></div>
+            </div>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-2 flex-1 mt-1">
+              <div>
+                <p class="text-text-muted text-xs">Open</p>
+                <p class="font-semibold" id="stock-open">—</p>
+              </div>
+              <div>
+                <p class="text-text-muted text-xs">High</p>
+                <p class="font-semibold text-gain" id="stock-high">—</p>
+              </div>
+              <div>
+                <p class="text-text-muted text-xs">Low</p>
+                <p class="font-semibold text-loss" id="stock-low">—</p>
+              </div>
+              <div>
+                <p class="text-text-muted text-xs">Prev Close</p>
+                <p class="font-semibold" id="stock-close">—</p>
+              </div>
+              <div>
+                <p class="text-text-muted text-xs">Volume</p>
+                <p class="font-semibold" id="stock-volume">—</p>
+              </div>
+              <div>
+                <p class="text-text-muted text-xs">52W High</p>
+                <p class="font-semibold text-gain" id="stock-52high">—</p>
+              </div>
+              <div>
+                <p class="text-text-muted text-xs">52W Low</p>
+                <p class="font-semibold text-loss" id="stock-52low">—</p>
+              </div>
+              <div>
+                <p class="text-text-muted text-xs">Mkt Cap</p>
+                <p class="font-semibold" id="stock-mktcap">—</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Chart -->
+          <div class="glass-card rounded-xl p-4 space-y-3">
+            <div class="flex items-center justify-between flex-wrap gap-2">
+              <h3 class="font-semibold text-sm">Price Chart</h3>
+              <div class="flex gap-1">
+                <button onclick="Stock.setRange('5d')" class="chart-period active" id="period-5d">5D</button>
+                <button onclick="Stock.setRange('1mo')" class="chart-period" id="period-1mo">1M</button>
+                <button onclick="Stock.setRange('3mo')" class="chart-period" id="period-3mo">3M</button>
+                <button onclick="Stock.setRange('1y')" class="chart-period" id="period-1y">1Y</button>
+              </div>
+            </div>
+            <div id="stock-chart-container" class="w-full h-64 md:h-80 rounded-lg overflow-hidden"></div>
+          </div>
+
+          <!-- Notes -->
+          <div class="glass-card rounded-xl p-4 space-y-3">
+            <div class="flex items-center justify-between">
+              <h3 class="font-semibold text-sm flex items-center gap-2">
+                <i data-lucide="file-text" class="w-4 h-4 text-accent"></i>
+                My Analysis Notes
+              </h3>
+              <span class="text-xs text-text-muted">Saved locally</span>
+            </div>
+            <textarea id="stock-notes" rows="5" placeholder="Write your analysis, price targets, catalysts..."
+              class="w-full bg-bg-primary border border-border-dim rounded-xl px-4 py-3 text-sm resize-none focus:outline-none focus:border-accent/60 focus:ring-1 focus:ring-accent/30 transition-all placeholder-text-muted leading-relaxed"
+              oninput="Stock.saveNotes()"></textarea>
+            <div class="flex items-center gap-2">
+              <div class="w-2 h-2 rounded-full bg-gain animate-pulse-slow" id="notes-saved-dot"></div>
+              <span class="text-xs text-text-muted" id="notes-saved-label">Auto-saved</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── SETTINGS ── -->
+        <div id="section-settings" class="app-section hidden p-4 md:p-6 max-w-2xl space-y-5 animate-slide-up">
+          <div>
+            <h1 class="text-2xl font-bold">Settings</h1>
+            <p class="text-text-muted text-sm mt-0.5">Manage your account and data preferences</p>
+          </div>
+
+          <!-- Profile Card -->
+          <div class="glass-card rounded-xl p-5 space-y-4">
+            <h3 class="font-semibold text-sm text-text-dim uppercase tracking-wider">Profile</h3>
+            <div class="flex items-center gap-4">
+              <div
+                class="w-14 h-14 rounded-2xl bg-gradient-to-br from-accent to-indigo-500 flex items-center justify-center text-2xl font-bold"
+                id="settings-avatar">U</div>
+              <div>
+                <p class="font-semibold" id="settings-name">User</p>
+                <p class="text-text-muted text-sm" id="settings-email">user@example.com</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Data Management -->
+          <div class="glass-card rounded-xl p-5 space-y-4">
+            <h3 class="font-semibold text-sm text-text-dim uppercase tracking-wider">Data Management</h3>
+            <div class="space-y-3">
+              <div class="flex items-center justify-between py-2 border-b border-border-dim">
+                <div>
+                  <p class="text-sm font-medium">Watchlist</p>
+                  <p class="text-xs text-text-muted" id="settings-watchlist-count">0 stocks</p>
+                </div>
+                <button onclick="Settings.clearWatchlist()" class="text-xs text-loss hover:underline">Clear</button>
+              </div>
+              <div class="flex items-center justify-between py-2 border-b border-border-dim">
+                <div>
+                  <p class="text-sm font-medium">Stock Notes</p>
+                  <p class="text-xs text-text-muted" id="settings-notes-count">0 notes</p>
+                </div>
+                <button onclick="Settings.clearNotes()" class="text-xs text-loss hover:underline">Clear</button>
+              </div>
+              <div class="flex items-center justify-between py-2">
+                <div>
+                  <p class="text-sm font-medium">Cache</p>
+                  <p class="text-xs text-text-muted">Session cache for API responses</p>
+                </div>
+                <button onclick="Settings.clearCache()" class="text-xs text-accent hover:underline">Clear</button>
+              </div>
+            </div>
+            <button onclick="Settings.clearAll()" class="btn-danger text-sm gap-2 w-full">
+              <i data-lucide="trash-2" class="w-4 h-4"></i>
+              Clear All Local Data & Logout
+            </button>
+          </div>
+
+          <!-- About -->
+          <div class="glass-card rounded-xl p-5 space-y-2">
+            <h3 class="font-semibold text-sm text-text-dim uppercase tracking-wider">About</h3>
+            <p class="text-sm text-text-muted">MyStocks v1.0.0 — Built for GitHub Pages</p>
+            <p class="text-xs text-text-muted">Data sourced from Yahoo Finance public API. This is a demo tool — not
+              financial advice.</p>
+          </div>
+        </div>
+
+      </main>
+    </div>
+  </section>
+
+  <!-- JavaScript Modules -->
+  <script src="js/ui.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/charts.js"></script>
+  <script src="js/watchlist.js"></script>
+  <script src="js/dashboard.js"></script>
+  <script src="js/stock.js"></script>
+  <script src="js/app.js"></script>
+
+</body>
+
+</html>
