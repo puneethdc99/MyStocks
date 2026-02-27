@@ -1,30 +1,25 @@
 /* ═══════════════════════════════════════════
-   auth.js — Open Authentication System
-   • Any valid email + any password → works
-   • First login auto-creates the account
-   • Returning users must match their password
-   • All data stored in localStorage (no backend)
-   ⚠️ Client-side only — demo/prototype tool.
+   auth.js — Authentication System
+   • Login tab  : existing accounts only
+   • Sign Up tab: create new account (email+password)
+   All data stored in localStorage — no backend.
 ═══════════════════════════════════════════ */
 const Auth = (() => {
     const USERS_KEY = 'nse_users';
     const SESSION_KEY = 'nse_session';
 
-    /* ── Email format validator ── */
+    /* ── Helpers ── */
     function isValidEmail(email) {
         return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email);
     }
 
-    /* ── Derive a display name from email (e.g. john.doe@... → John Doe) ── */
     function nameFromEmail(email) {
-        const local = email.split('@')[0];           // "john.doe" or "john_doe"
-        return local
-            .replace(/[._\-+]/g, ' ')                 // replace separators with space
-            .replace(/\b\w/g, c => c.toUpperCase())   // Title Case
+        return email.split('@')[0]
+            .replace(/[._\-+]/g, ' ')
+            .replace(/\b\w/g, c => c.toUpperCase())
             .trim() || email;
     }
 
-    /* ── Storage helpers ── */
     function getUsers() {
         try { return JSON.parse(localStorage.getItem(USERS_KEY)) || []; }
         catch { return []; }
@@ -34,6 +29,7 @@ const Auth = (() => {
         localStorage.setItem(USERS_KEY, JSON.stringify(users));
     }
 
+    /* ── Session ── */
     function getSession() {
         try { return JSON.parse(localStorage.getItem(SESSION_KEY)); }
         catch { return null; }
@@ -51,9 +47,9 @@ const Auth = (() => {
             document.getElementById(`tab-${t}`)?.classList.toggle('active', t === tab);
             document.getElementById(`form-${t}`)?.classList.toggle('hidden', t !== tab);
         });
-        ['login-error', 'signup-error'].forEach(id => {
-            document.getElementById(id)?.classList.add('hidden');
-        });
+        ['login-error', 'signup-error'].forEach(id =>
+            document.getElementById(id)?.classList.add('hidden')
+        );
     }
 
     function showError(id, msg) {
@@ -63,18 +59,16 @@ const Auth = (() => {
         el.classList.remove('hidden');
     }
 
-    /* ── LOGIN ──────────────────────────────
-       Works for BOTH new and returning users:
-       • New email   → auto-register + login
-       • Known email → validate password, login
-    ─────────────────────────────────────── */
+    /* ── LOGIN (existing accounts only) ──────────────────────────
+       Does NOT auto-create. Unknown email → "Please Sign Up first."
+    ─────────────────────────────────────────────────────────────── */
     function handleLogin(e) {
         e.preventDefault();
         const email = document.getElementById('login-email').value.trim().toLowerCase();
         const password = document.getElementById('login-password').value;
 
         if (!isValidEmail(email)) {
-            showError('login-error', 'Please enter a valid email address (e.g. you@example.com).');
+            showError('login-error', 'Please enter a valid email address.');
             return;
         }
         if (!password) {
@@ -85,27 +79,23 @@ const Auth = (() => {
         const users = getUsers();
         const existing = users.find(u => u.email === email);
 
-        if (existing) {
-            /* ── Returning user — validate password ── */
-            if (existing.password !== btoa(password)) {
-                showError('login-error', 'Incorrect password. Please try again.');
-                return;
-            }
-            setSession(existing);
-            App.onLogin(existing, false); // false = returning user
-
-        } else {
-            /* ── New user — auto-register with derived name ── */
-            const name = nameFromEmail(email);
-            const newUser = { name, email, password: btoa(password) };
-            users.push(newUser);
-            saveUsers(users);
-            setSession(newUser);
-            App.onLogin(newUser, true); // true = first time
+        if (!existing) {
+            showError('login-error', "No account found for this email. Please Sign Up first.");
+            return;
         }
+
+        if (existing.password !== btoa(password)) {
+            showError('login-error', 'Incorrect password. Please try again.');
+            return;
+        }
+
+        setSession(existing);
+        App.onLogin(existing, false);
     }
 
-    /* ── SIGN UP (explicit — lets user set a custom name) ─────────────── */
+    /* ── SIGN UP ─────────────────────────────────────────────────
+       Creates a new email+password account.
+    ─────────────────────────────────────────────────────────────── */
     function handleSignup(e) {
         e.preventDefault();
         const name = document.getElementById('signup-name').value.trim();
@@ -127,7 +117,11 @@ const Auth = (() => {
             return;
         }
 
-        const newUser = { name: name || nameFromEmail(email), email, password: btoa(password) };
+        const newUser = {
+            name: name || nameFromEmail(email),
+            email,
+            password: btoa(password),
+        };
         users.push(newUser);
         saveUsers(users);
         setSession(newUser);
@@ -143,7 +137,7 @@ const Auth = (() => {
 
     /* ── Init ── */
     function init() {
-        return getSession(); // just return existing session (no demo seeding needed)
+        return getSession();
     }
 
     return { init, showTab, handleLogin, handleSignup, logout, getSession, isValidEmail };

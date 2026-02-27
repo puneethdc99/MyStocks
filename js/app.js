@@ -98,8 +98,11 @@ const App = (() => {
         document.getElementById('page-auth').classList.remove('hidden');
         document.getElementById('page-app').classList.add('hidden');
         Dashboard.stopAutoRefresh?.();
-        // Re-init icons
-        setTimeout(() => lucide.createIcons(), 50);
+        // Re-init Lucide icons and Google Sign-In button
+        setTimeout(() => {
+            lucide.createIcons();
+            Auth.initGoogleSignIn();
+        }, 100);
     }
 
     /* ── Show App (after login) ── */
