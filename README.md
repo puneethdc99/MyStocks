@@ -135,4 +135,6 @@ Built by **[puneethdc99](https://github.com/puneethdc99)**
 
 ---
 
+Live at: https://puneethdc99.github.io/MyStocks/
+
 *MyStocks v1.0.0 — Zero backend. Zero cost. Pure browser.*
