@@ -6,6 +6,7 @@ const Stock = (() => {
     let _symbol = null;
     let _quote = null;
     let _range = '5d';
+    let _retryTimer = null;   // polling timer handle
 
     const NOTES_PREFIX = 'nse_notes_';
 
@@ -35,11 +36,37 @@ const Stock = (() => {
             _renderQuote(_quote);
         }
 
-        // Fetch & render chart
-        _renderChart(symbol, '5d');
+        // Start chart: click 5D button, then keep retrying until the canvas appears.
+        _triggerChartWithRetry();
 
         // Update watchlist toggle button
         _updateWatchlistBtn();
+    }
+
+    /* ── Chart trigger with retry ──
+       Clicks the 5D button immediately, then polls every 500ms.
+       If no <canvas> appears within the poll window, clicks again.
+       Stops once the chart canvas exists OR after 15 s (30 tries). */
+    function _triggerChartWithRetry() {
+        // Cancel any previous retry loop (e.g. user opened a new stock fast)
+        if (_retryTimer) clearInterval(_retryTimer);
+
+        // Immediate first attempt
+        document.getElementById('period-5d')?.click();
+
+        let tries = 0;
+        _retryTimer = setInterval(() => {
+            const container = document.getElementById('stock-chart-container');
+            const hasCanvas = container && container.querySelector('canvas');
+            tries++;
+            if (hasCanvas || tries >= 30) {
+                clearInterval(_retryTimer);
+                _retryTimer = null;
+                return;
+            }
+            // No chart yet — re-click the 5D button
+            document.getElementById('period-5d')?.click();
+        }, 500);
     }
 
     function _resetSkeletons() {
@@ -81,7 +108,6 @@ const Stock = (() => {
         }
 
         // OHLC
-        document.getElementById('stock-open')?.(() => { })();
         const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
         set('stock-open', API.formatPrice(q.open));
         set('stock-high', API.formatPrice(q.high));
@@ -96,25 +122,47 @@ const Stock = (() => {
     async function _renderChart(symbol, range) {
         const container = document.getElementById('stock-chart-container');
         if (!container) return;
-        container.innerHTML = `<div class="flex items-center justify-center h-full"><div class="skeleton-block w-full h-full rounded-lg" style="height:300px"></div></div>`;
+
+        // Show overlay while loading (don't wipe container.innerHTML — LWC owns it)
+        let overlay = document.getElementById('stock-chart-overlay');
+        if (!overlay) {
+            overlay = document.createElement('div');
+            overlay.id = 'stock-chart-overlay';
+            overlay.style.cssText = 'position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:10';
+            overlay.innerHTML = '<div class="skeleton-block" style="position:absolute;inset:0;border-radius:8px"></div>';
+            container.style.position = 'relative';
+            container.appendChild(overlay);
+        }
+        overlay.style.display = 'flex';
 
         try {
             const data = await API.fetchHistory(symbol, range);
-            const isPos = data.length > 1 ? data[data.length - 1].close >= data[0].close : true;
-            container.innerHTML = '';
+            overlay.style.display = 'none';
 
-            // Use candlestick for longer ranges, area for short
-            if (range === '5d' || range === '1mo') {
-                Charts.renderAreaChart('stock-chart-container', data, isPos);
-            } else {
-                Charts.renderCandlestickChart('stock-chart-container', data);
+            if (!data || !data.length) {
+                container.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted);font-size:.875rem">No chart data</div>';
+                return;
+            }
+
+            const isPos = data.length > 1 ? data[data.length - 1].close >= data[0].close : true;
+            const chart = Charts.renderAreaChart('stock-chart-container', data, isPos);
+
+            // Force correct dimensions immediately after creation
+            if (chart) {
+                chart.applyOptions({
+                    width: container.clientWidth || 696,
+                    height: container.clientHeight || 300,
+                });
+                chart.timeScale().fitContent();
             }
         } catch (err) {
-            container.innerHTML = `<div class="flex items-center justify-center h-full text-text-muted text-sm">Chart unavailable</div>`;
+            console.error('[Chart]', err);
+            if (overlay) overlay.style.display = 'none';
+            container.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted);font-size:.875rem">Chart unavailable</div>';
         }
     }
 
-    /* ── Period change ── */
+    /* ── Period change (called by HTML button onclick) ── */
     async function setRange(range) {
         _range = range;
         ['5d', '1mo', '3mo', '1y'].forEach(r => {
@@ -128,7 +176,7 @@ const Stock = (() => {
         if (!_symbol) return;
         Watchlist.toggle(_symbol);
         _updateWatchlistBtn();
-        if (document.getElementById('section-watchlist').classList.contains('active')) {
+        if (document.getElementById('section-watchlist')?.classList.contains('active')) {
             Watchlist.renderWatchlist();
         }
     }

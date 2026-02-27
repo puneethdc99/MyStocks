@@ -19,9 +19,10 @@ const API = (() => {
     function buildUrls(symbol, params, bust) {
         // bust = unique timestamp string; makes each URL unique to force fresh fetch
         const yfUrl = `${YF_BASE}${encodeURIComponent(symbol)}?${params}&_t=${bust}`;
+        const isLocal = location.protocol === 'file:';
         return [
-            // 1. Direct (works on GitHub Pages / HTTPS hosts with no additional overhead)
-            yfUrl,
+            // 1. Direct — works on GitHub Pages / HTTPS; skipped on file:// (CORS blocked)
+            ...(isLocal ? [] : [yfUrl]),
             // 2. corsproxy.io
             `https://corsproxy.io/?${encodeURIComponent(yfUrl)}`,
             // 3. allorigins.win
@@ -73,7 +74,7 @@ const API = (() => {
         for (const url of urls) {
             try {
                 const ctrl = new AbortController();
-                const timer = setTimeout(() => ctrl.abort(), 9000);
+                const timer = setTimeout(() => ctrl.abort(), 5000);
 
                 const res = await fetch(url, {
                     signal: ctrl.signal,

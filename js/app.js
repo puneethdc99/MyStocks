@@ -100,11 +100,7 @@ const App = (() => {
         document.getElementById('page-auth').classList.remove('hidden');
         document.getElementById('page-app').classList.add('hidden');
         Dashboard.stopAutoRefresh?.();
-        // Re-init Lucide icons and Google Sign-In button
-        setTimeout(() => {
-            lucide.createIcons();
-            Auth.initGoogleSignIn();
-        }, 100);
+        setTimeout(() => lucide.createIcons(), 100);
     }
 
     /* ── Show App (after login) ── */
@@ -186,6 +182,11 @@ const App = (() => {
 
     /* ── Navigation helpers ── */
     function openStock(symbol) {
+        // Close search dropdown and clear input before navigating
+        const dd = document.getElementById('search-dropdown');
+        const si = document.getElementById('global-search');
+        if (dd) dd.classList.add('hidden');
+        if (si) si.value = '';
         window.location.hash = `#/stock/${encodeURIComponent(symbol)}`;
     }
 

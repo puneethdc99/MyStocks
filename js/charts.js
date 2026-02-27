@@ -70,7 +70,19 @@ const Charts = (() => {
         areaSeries.setData(seriesData);
         chart.timeScale().fitContent();
 
-        // Resize observer
+        // Force a resize once the browser has finished painting the container.
+        // Without this, clientWidth can be 0 on first open (section just showed),
+        // producing a blank chart until the user clicks a period button.
+        requestAnimationFrame(() => {
+            const w = container.clientWidth;
+            const h = container.clientHeight;
+            if (w > 0) {
+                chart.applyOptions({ width: w, height: h || 300 });
+                chart.timeScale().fitContent();
+            }
+        });
+
+        // Resize observer (handles subsequent window/panel resizes)
         const ro = new ResizeObserver(() => {
             chart.applyOptions({ width: container.clientWidth, height: container.clientHeight });
         });
